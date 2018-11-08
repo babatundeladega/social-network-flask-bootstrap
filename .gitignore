@@ -1,0 +1,12 @@
+.idea/
+
+*_LOCAL
+*_REMOTE
+*.orig
+
+*.pyc
+
+instance/config.py
+
+local_migrations/
+remote_migrations/

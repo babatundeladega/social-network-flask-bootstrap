@@ -1,0 +1,15 @@
+    This is the backend for apps that will help stores keep track of inventory,
+customer information, handle customer interaction and make their stock more
+discoverable.
+
+
+Ext App Requests = N1.5
+SMS = N2.85
+Email = N0.03
+
+
+TO DO
+==============
+1. Create Reviews module
+2. Create Messaging module
+3. Create Interaction module

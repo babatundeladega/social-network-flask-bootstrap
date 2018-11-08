@@ -1,0 +1,16 @@
+flask
+flask_httpauth
+flask_mail
+flask_migrate
+flask_script
+flask_sqlalchemy
+forex_python
+gunicorn
+jsonpickle
+lepl
+pymysql
+psycopg2
+requests
+shortuuid
+simplejson
+validators

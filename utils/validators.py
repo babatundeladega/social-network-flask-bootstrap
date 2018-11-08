@@ -1,0 +1,81 @@
+from lepl.apps.rfc3696 import Email
+
+from app.errors import BadRequest
+
+
+def check_address_field(value):
+    if value is None:
+        return
+
+    required_keys = {'street_address', 'lga', 'town', 'country', 'province',
+        'state', 'zip_code'}
+
+    missing_required_keys = required_keys - set(value.keys())
+
+    if missing_required_keys:
+        raise BadRequest(
+            '{} must be included in `address` fields'.format(
+                missing_required_keys)
+        )
+
+
+def check_amount_field(value):
+    try:
+        float(value)
+    except ValueError:
+        raise BadRequest('{} is an invalid amount'.format(value))
+
+
+def check_email_field(value):
+    if value is None:
+        return
+
+    validator = Email()
+    if not validator(value):
+        raise BadRequest('`email` {} is invalid.'.format(value))
+
+
+def check_field_length(value, length, _greater=True, _lesser=False):
+    if value is None:
+        return
+
+    if _greater and len(value) < length:
+        raise BadRequest(
+            'Field must be greater than {} characters'.format(length))
+
+    if _lesser and len(value) > length:
+        raise BadRequest(
+            'Field must be lesser than {} characters'.format(length))
+
+
+def check_phone_field(value):
+    if value is None:
+        return
+
+    value = value.strip().strip('+').replace(' ', '').replace(
+        '-', '')
+
+    try:
+        if not value.isdigit():
+            raise BadRequest('Phone number is invalid.')
+
+        if len(value) == 10 and not value.startswith('0'):
+            value = '234' + value
+        elif len(value) == 11 and value.startswith('0'):
+            value = '234' + value[1:]
+        elif value.startswith('234') and len(value) == 13:
+            pass
+        else:
+            raise BadRequest('Phone number is invalid.')
+
+        return value
+
+    except:
+        raise BadRequest('Phone number is invalid.')
+
+
+def check_url_field(value):
+    if value is None:
+        return
+
+    return
