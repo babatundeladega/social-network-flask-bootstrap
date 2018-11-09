@@ -15,7 +15,7 @@ from utils.contexts import (
     get_current_api_ref, get_current_request_data, get_current_request_headers)
 
 
-GEO_LOCATION_FIELD = db.Float(6, 6)
+conversation_participants = None
 
 
 class BaseModel(db.Model, HasStatus, Persistence):
@@ -80,7 +80,16 @@ class Blob(BaseModel):
 class Comment(BaseModel):
     __tablename__ = 'comments'
 
-    body = db.Column(db.TEXT)
+    text = db.Column(db.TEXT)
+
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
+
+    post = db.relationship(
+        'Post', backref=db.backref('comments', uselist=True), uselist=False)
+
+
+class Conversation(BaseModel):
+    __tablename__ = 'conversations'
 
 
 class Like(BaseModel):
@@ -98,6 +107,11 @@ class Like(BaseModel):
 class Location(BaseModel):
     __tablename__ = 'locations'
 
+    postal_code = db.Column(db.String(20))
+    street_address = db.Column(db.String(20))
+    city = db.Column(db.String(32))
+    state = db.Column(db.String(32))
+    country = db.Column(db.String(30))
     latitude = db.Column(db.String(10))
     longitude = db.Column(db.String(10))
 
@@ -106,6 +120,12 @@ class Message(BaseModel):
     __tablename__ = 'messages'
 
     text = db.Column(db.TEXT)
+
+    conversation_id = db.Column(db.Integer, db.ForeignKey('conversations.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    user = db.relationship(
+        'User', backref=db.backref('likes', uselist=True), uselist=False)
 
 
 class MessageAttachment(BaseModel):
@@ -123,7 +143,7 @@ class MessageAttachment(BaseModel):
 class Post(BaseModel, HasLocation):
     __tablename__ = 'posts'
 
-    body = db.Column(db.TEXT)
+    text = db.Column(db.TEXT)
 
     photo_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -144,10 +164,11 @@ class Status(BaseModel, LookUp):
 class Story(BaseModel, HasLocation):
     __tablename__ = 'stories'
 
-    media = db.Column(db.Integer, db.ForeignKey('blobs.id'))
-
+    text = db.Column(db.String(512))
+    media_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
+    media = db.relationship('Blob', uselist=False)
     user = db.relationship('User', uselist=False)
 
 
