@@ -1,3 +1,5 @@
+ACCEPTED_MIME_TYPES = [
+    'application/json', 'application/pdf', 'image/png', 'video/mp4']
 APP_NAME = ''
 
 DEFAULT_TOKEN_COUNT = 20
@@ -6,5 +8,7 @@ EMAIL_CONFIRMATION_LINK_LIFESPAN = (60 * 60)
 
 MIN_USERNAME_LENGTH = 2
 MIN_USER_BIO_LENGTH = 4
+
+NESTED_VALUES_LIMIT = 20
 
 SUPPORTED_HTTP_METHODS = ['GET', 'POST', 'PATCH', 'PUT', 'DELETE']

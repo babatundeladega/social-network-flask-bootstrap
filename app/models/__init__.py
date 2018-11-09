@@ -1,30 +1,21 @@
 from datetime import datetime
-from decimal import Decimal
 import time
 
 from flask import current_app, g
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
-from sqlalchemy import and_
-from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
-from app.constants import (
-    COMMISSION_RATE, DEFAULT_TOKEN_COUNT, NESTED_VALUES_LIMIT,
-    PAYMENT_CATEGORIES, TOKEN_EQUIVALENT_OF_USD, TOLL_FREE_DAILY_REQUESTS)
-from app.constants.statuses import (
-    ACTIVE_STATUS_ID, DELETED_STATUS_ID, DISABLED_STATUS_ID)
-from app.models.mixins import HasStatus, HasToken, LookUp, Persistence
+from app.constants import ACCEPTED_MIME_TYPES, NESTED_VALUES_LIMIT
+from app.constants.statuses import DELETED_STATUS_ID
+from app.models.mixins import (
+    HasLocation, HasStatus, HasToken, LookUp, Persistence)
 from utils import generate_unique_reference
 from utils.contexts import (
     get_current_api_ref, get_current_request_data, get_current_request_headers)
 
 
-EMPTY_AMOUNT = '0.00'
-AMOUNT_FIELD = db.DECIMAL(12, 6)
 GEO_LOCATION_FIELD = db.Float(6, 6)
-APP_OWNERSHIP_OPTIONS = ('Proprietary', 'Third Party')
-THIRD_PARTY_APP_OWNERSHIP = 'Third Party'
 
 
 class BaseModel(db.Model, HasStatus, Persistence):
@@ -61,8 +52,8 @@ class BaseModel(db.Model, HasStatus, Persistence):
         return [record[0] for record in query_.all()]
 
 
-class APILog(BaseModel):
-    __tablename__ = 'api_logs'
+class AccessLog(BaseModel):
+    __tablename__ = 'access_logs'
 
     api_ref = db.Column(
         db.String(64), default=get_current_api_ref, index=True, unique=True)
@@ -79,63 +70,36 @@ class APILog(BaseModel):
         'User', backref=db.backref('api_logs', uselist=True), uselist=False)
 
 
-class App(BaseModel):
-    __tablename__ = 'apps'
+class Blob(BaseModel):
+    __tablename__ = 'blobs'
 
-    api_key = db.Column(db.String(64), default=generate_unique_reference)
-    description = db.Column(db.String(128))
-    image = db.Column(db.TEXT)
-    meta = db.Column(db.TEXT, default="{}")
-    name = db.Column(db.String(64))
-    privacy_policy_url = db.Column(db.TEXT)
-    ownership = db.Column(
-        db.Enum(*APP_OWNERSHIP_OPTIONS, name='app_ownership'),
-        default=THIRD_PARTY_APP_OWNERSHIP)
-    url = db.Column(db.String(128))
-    webhook_url = db.Column(db.String(128))
-
-    app_category_id = db.Column(db.Integer, db.ForeignKey('app_categories.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-
-    app_category = db.relationship(
-        'AppCategory', backref=db.backref('carts', uselist=True), uselist=False)
-    user = db.relationship(
-        'User', backref=db.backref('apps', uselist=True),
-        foreign_keys=[user_id], uselist=False)
-
-    def as_json(self, keys_to_exclude=None):
-        result = {
-            'created_at': self.created_at.isoformat(),
-            'api_key': self.api_key,
-            'app_category': self.app_category.as_json(),
-            'description': self.description,
-            'name': self.name,
-            'ownership': self.ownership,
-            'privacy_policy_url': self.privacy_policy_url,
-            'url': self.url,
-            'webhook_url': self.webhook_url,
-            'image': self.image
-        }
-
-        return result
+    data = db.Column(db.TEXT)
+    mime_type = db.Column(db.Enum(*ACCEPTED_MIME_TYPES))
 
 
-class AppCategory(BaseModel, LookUp):
-    __tablename__ = 'app_categories'
+class Comment(BaseModel):
+    __tablename__ = 'comments'
 
-    name = db.Column(db.String(16))
-    description = db.Column(db.String(128))
-
-    def as_json(self):
-        return {
-            'created_at': self.created_at.isoformat(),
-            'name': self.name,
-            'description': self.description
-        }
+    body = db.Column(db.TEXT)
 
 
 class Like(BaseModel):
     __tablename__ = 'likes'
+
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    post = db.relationship(
+        'Post', backref=db.backref('likes', uselist=True), uselist=False)
+    user = db.relationship(
+        'User', backref=db.backref('likes', uselist=True), uselist=False)
+
+
+class Location(BaseModel):
+    __tablename__ = 'locations'
+
+    latitude = db.Column(db.String(10))
+    longitude = db.Column(db.String(10))
 
 
 class Message(BaseModel):
@@ -150,8 +114,13 @@ class MessageAttachment(BaseModel):
     message_id = db.Column(db.Integer, db.ForeignKey('messages.id'))
     blob_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
 
+    message = db.relationship(
+        'Message', backref=db.backref('message_attachments'), uselist=False)
+    blob = db.relationship(
+        'Blob', backref=db.backref('message_attachments'), uselist=False)
 
-class Post(BaseModel):
+
+class Post(BaseModel, HasLocation):
     __tablename__ = 'posts'
 
     body = db.Column(db.TEXT)
@@ -160,9 +129,9 @@ class Post(BaseModel):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     video_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
 
-
-class Comment(BaseModel):
-    __tablename__ = 'comments'
+    photo = db.relationship('Blob', uselist=False, foreign_keys=[photo_id])
+    user = db.relationship('User', uselist=False)
+    video = db.relationship('Blob', uselist=False, foreign_keys=[video_id])
 
 
 class Status(BaseModel, LookUp):
@@ -172,7 +141,17 @@ class Status(BaseModel, LookUp):
         return self.name
 
 
-class User(BaseModel, HasToken):
+class Story(BaseModel, HasLocation):
+    __tablename__ = 'stories'
+
+    media = db.Column(db.Integer, db.ForeignKey('blobs.id'))
+
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    user = db.relationship('User', uselist=False)
+
+
+class User(BaseModel, HasToken, HasLocation):
     """Users of the social network"""
     __tablename__ = 'users'
 
@@ -184,10 +163,10 @@ class User(BaseModel, HasToken):
     phone = db.Column(db.String(20), unique=True, index=True)
     phone_confirmed = db.Column(db.Boolean, default=False)
     profile_photo_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
-    tokens = db.Column(AMOUNT_FIELD, default=DEFAULT_TOKEN_COUNT)
 
     created_by = db.Column(db.Integer, db.ForeignKey('apps.id'))
-    profile_photo = db.relationship('Blob', uselist=True)
+
+    profile_photo = db.relationship('Blob', uselist=False)
 
     @property
     def _profile_photo(self):
@@ -231,10 +210,6 @@ class User(BaseModel, HasToken):
     def password(self, password):
         self.password_hash = generate_password_hash(
             password, method='pbkdf2:sha512')
-
-    def record_request_cost(self, cost):
-        self.tokens -= cost
-        self.save()
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)

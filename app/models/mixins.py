@@ -17,6 +17,19 @@ def _commit_to_db():
         raise
 
 
+class HasLocation(object):
+    @declared_attr
+    def location_id(self):
+        return db.Column(
+            db.Integer, db.ForeignKey('locations.id'),
+            default=statuses.ACTIVE_STATUS_ID)
+
+    @declared_attr
+    def location(self):
+        return db.relationship(
+            'Location', lazy=True, foreign_keys=[self.location_id])
+
+
 class HasStatus(object):
     @declared_attr
     def status_id(self):
