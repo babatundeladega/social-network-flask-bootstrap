@@ -15,7 +15,18 @@ from utils.contexts import (
     get_current_api_ref, get_current_request_data, get_current_request_headers)
 
 
-conversation_participants = None
+conversation_participants = db.Table(
+    'conversation_participants', db.metadata,
+    db.Column('conversation_id', db.Integer, db.ForeignKey('conversations.id')),
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'))
+)
+
+
+followers = db.Table(
+    'followers', db.metadata,
+    db.Column('follower_id', db.Integer, db.ForeignKey('users.id')),
+    db.Column('followed_id', db.Integer, db.ForeignKey('users.id'))
+)
 
 
 class BaseModel(db.Model, HasStatus, Persistence):
@@ -83,13 +94,39 @@ class Comment(BaseModel):
     text = db.Column(db.TEXT)
 
     post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     post = db.relationship(
         'Post', backref=db.backref('comments', uselist=True), uselist=False)
+    user = db.relationship(
+        'User', backref=db.backref('comments', uselist=True), uselist=False)
+
+    def user_can_reply(self, user):
+        return self.user == user or self.post.user == user
+
+
+class CommentReply(BaseModel):
+    __tablename__ = 'comment_replies'
+
+    text = db.Column(db.TEXT)
+
+    comment_id = db.Column(db.Integer, db.ForeignKey('comments.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    comment = db.relationship(
+        'Comment', backref=db.backref('comment_replies', uselist=True),
+        uselist=False)
+    user = db.relationship(
+        'User', backref=db.backref('comment_replies', uselist=True),
+        uselist=False)
 
 
 class Conversation(BaseModel):
     __tablename__ = 'conversations'
+
+    users = db.relationship(
+        "Conversation", secondary=conversation_participants,
+        backref=db.backref('users', uselist=True), uselist=True)
 
 
 class Like(BaseModel):
@@ -188,6 +225,11 @@ class User(BaseModel, HasToken, HasLocation):
     created_by = db.Column(db.Integer, db.ForeignKey('apps.id'))
 
     profile_photo = db.relationship('Blob', uselist=False)
+    followed = db.relationship(
+        'User', secondary=followers,
+        primaryjoin=(followers.c.follower_id == id),
+        secondaryjoin=(followers.c.followed_id == id),
+        backref=db.backref('followers', lazy='dynamic'), lazy='dynamic')
 
     @property
     def _profile_photo(self):
