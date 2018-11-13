@@ -213,12 +213,27 @@ class Notification(BaseModel):
 
     text = db.Column(db.String(128))
 
+    notification_event_id = db.Column(
+        db.Integer, db.ForeignKey('notification_events.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
+    notification_event = db.relationship('NotificationEvent', uselist=False)
     user = db.relationship('User', uselist=False)
 
     def mark_as_read(self):
         self.update(status_id=READ_STATUS_ID)
+
+    def as_json(self):
+        result = {
+            'text': self.text,
+            'created_at': self.created_at.isoformat(),
+            'notification_entities': [
+                item.as_json() for item in self.notification_entities
+            ],
+            'notification_event': self.notification_event.as_json(),
+        }
+
+        return result
 
 
 class NotificationEntity(BaseModel):
@@ -229,13 +244,34 @@ class NotificationEntity(BaseModel):
         db.Integer, db.ForeignKey('notification_entity_types.id'))
     notification_id = db.Column(db.Integer, db.ForeignKey('notifications.id'))
 
-    notification = db.relationship('Notification', uselist=False)
-    notification_entity_type = db.relationship(
-        'NotificationEntityType', uselist=False)
+    notification = db.relationship(
+        'Notification',
+        backref=db.backref('notification_entities', uselist=True),
+        uselist=False)
+    notification_entity_type = (
+        db.relationship('NotificationEntityType', uselist=False))
+
+    def as_json(self):
+        entity_cls = {
+            'Post': Post,
+            'Story': Story,
+            'User': User
+        }[self.notification_entity_type.name]
+
+        return {
+            'entity': entity_cls.get_not_deleted(id=self.entity_id),
+            'notification_entity_type': self.notification_entity_type.as_json()
+        }
 
 
 class NotificationEntityType(BaseModel, LookUp):
+    """Whether it's a User, Post, Status"""
     __tablename__ = 'notification_entity_types'
+
+
+class NotificationEvent(BaseModel, LookUp):
+    """Whether it's a like, comment, post, follow"""
+    __tablename__ = 'notification_events'
 
 
 class Post(BaseModel, HasLocation):
