@@ -8,7 +8,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
 from app.constants import ACCEPTED_MIME_TYPES, NESTED_VALUES_LIMIT
-from app.constants.statuses import DELETED_STATUS_ID
+from app.constants.statuses import (
+    ACTIVE_STATUS_ID, DELETED_STATUS_ID, READ_STATUS_ID)
 from app.models.mixins import (
     HasLocation, HasStatus, HasToken, LookUp, Persistence)
 from utils import generate_unique_reference
@@ -39,12 +40,41 @@ class BaseModel(db.Model, HasStatus, Persistence):
     uid = db.Column(db.String(64), default=generate_unique_reference)
 
     @classmethod
-    def get(cls, **kwargs):
-        return cls.query.filter(
+    def get_active(cls, _desc=True, **kwargs):
+        return cls.prepare_get_active(
+            _desc=_desc,
+            **kwargs
+        ).first()
+
+    @classmethod
+    def prepare_get_active(cls, _desc=True, **kwargs):
+        query = cls.query.filter(
+            cls.status_id == ACTIVE_STATUS_ID,
+        ).filter_by(
+            **kwargs
+        )
+
+        if _desc:
+            query = query.order_by(cls.id.desc())
+
+        return query
+
+    @classmethod
+    def get_not_deleted(cls, _desc=True, **kwargs):
+        return cls.prepare_get_not_deleted(_desc=_desc, **kwargs).first()
+
+    @classmethod
+    def prepare_get_not_deleted(cls, _desc=True, **kwargs):
+        query =  cls.query.filter(
             cls.status_id != DELETED_STATUS_ID,
         ).filter_by(
             **kwargs
-        ).first()
+        )
+
+        if _desc:
+            query = query.order_by(cls.id.desc())
+
+        return query
 
     @classmethod
     def scalar_get(cls, required_column, _desc=True, **args):
@@ -178,6 +208,36 @@ class MessageAttachment(BaseModel):
         'Blob', backref=db.backref('message_attachments'), uselist=False)
 
 
+class Notification(BaseModel):
+    __tablename__ = 'notifications'
+
+    text = db.Column(db.String(128))
+
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    user = db.relationship('User', uselist=False)
+
+    def mark_as_read(self):
+        self.update(status_id=READ_STATUS_ID)
+
+
+class NotificationEntity(BaseModel):
+    __tablename__ = 'notification_entities'
+
+    entity_id = db.Column(db.Integer)
+    notification_entity_type_id = db.Column(
+        db.Integer, db.ForeignKey('notification_entity_types.id'))
+    notification_id = db.Column(db.Integer, db.ForeignKey('notifications.id'))
+
+    notification = db.relationship('Notification', uselist=False)
+    notification_entity_type = db.relationship(
+        'NotificationEntityType', uselist=False)
+
+
+class NotificationEntityType(BaseModel, LookUp):
+    __tablename__ = 'notification_entity_types'
+
+
 class Post(BaseModel, HasLocation):
     __tablename__ = 'posts'
 
@@ -194,7 +254,7 @@ class Post(BaseModel, HasLocation):
 
     def user_can_comment(self, user):
         return self.comments_enabled and user.id not in loads(
-            user.blocked_users)
+            user.blocked_store_repliers)
 
 
 class Status(BaseModel, LookUp):
@@ -233,6 +293,8 @@ class User(BaseModel, HasToken, HasLocation):
     phone = db.Column(db.String(20), unique=True, index=True)
     phone_confirmed = db.Column(db.Boolean, default=False)
     profile_photo_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
+    blocked_users = db.Column(db.TEXT)
+    blocked_story_repliers = db.Column(db.TEXT)
 
     created_by = db.Column(db.Integer, db.ForeignKey('apps.id'))
 

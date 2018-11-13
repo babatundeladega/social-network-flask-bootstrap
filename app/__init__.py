@@ -5,9 +5,8 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
 from config import get_configuration_class
-from .logs import logger
 from .errors.handlers import setup_error_handling
-from .gateways.messaging_client.contrib.flask import MessagingAPIClient
+from .logs import logger
 from utils.contexts.handlers import before_every_request, after_every_request
 
 
@@ -16,7 +15,6 @@ config_object = get_configuration_class()
 
 
 db = SQLAlchemy()
-messaging_api_client = MessagingAPIClient()
 
 
 def _bind_request_contexts_handlers(app, blueprint):
@@ -44,6 +42,5 @@ def create_app():
     setup_error_handling(app)
 
     db.init_app(app)
-    messaging_api_client.init_app(app)
 
     return app
