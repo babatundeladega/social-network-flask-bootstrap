@@ -42,6 +42,12 @@ class HasStatus(object):
         return db.relationship(
             'Status', lazy=True, foreign_keys=[self.status_id])
 
+    def is_active(self):
+        return self.status_id == statuses.ACTIVE_STATUS_ID
+
+    def is_deleted(self):
+        return self.status_id == statuses.DELETED_STATUS_ID
+
 
 class HasToken(object):
     @classmethod
@@ -53,7 +59,7 @@ class HasToken(object):
         except SignatureExpired:
             raise errors.TokenExpired
         except BadSignature:
-            raise errors.InvalidToken
+            raise errors.InvalidAuthToken
 
         return getattr(cls, 'query').get(data['id'])
 

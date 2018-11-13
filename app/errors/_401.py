@@ -9,7 +9,7 @@ class AuthenticationError(APIError):
     message = 'Unauthorized'  # 'An internal server error occurred!'
 
 
-class InvalidToken(AuthenticationError):
+class InvalidAuthToken(AuthenticationError):
     message = 'Invalid authentication token provided.'
 
 

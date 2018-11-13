@@ -1,5 +1,6 @@
 flask
 flask_httpauth
+flask_jwt_extended==3.12.1
 flask_mail
 flask_migrate
 flask_script
@@ -8,6 +9,7 @@ forex_python
 gunicorn
 jsonpickle
 lepl
+pyjwt==1.6.4
 pymysql
 psycopg2
 requests

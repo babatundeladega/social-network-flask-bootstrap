@@ -1,11 +1,13 @@
 from flask.views import MethodView
 
+from .authentication import auth_required
 from app.errors import ResourceNotFound
 from app.models import Notification, User
 from utils.response_helpers import api_success_response
 
 
 class NotificationsView(MethodView):
+    @auth_required()
     def get(self, user_uid):
         user = User.get(uid=user_uid)
         if user is None:
