@@ -1,4 +1,5 @@
 from datetime import datetime
+from json import loads
 import time
 
 from flask import current_app, g
@@ -181,6 +182,7 @@ class Post(BaseModel, HasLocation):
     __tablename__ = 'posts'
 
     text = db.Column(db.TEXT)
+    comments_enabled = db.Column(db.Boolean, default=True)
 
     photo_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -189,6 +191,10 @@ class Post(BaseModel, HasLocation):
     photo = db.relationship('Blob', uselist=False, foreign_keys=[photo_id])
     user = db.relationship('User', uselist=False)
     video = db.relationship('Blob', uselist=False, foreign_keys=[video_id])
+
+    def user_can_comment(self, user):
+        return self.comments_enabled and user.id not in loads(
+            user.blocked_users)
 
 
 class Status(BaseModel, LookUp):
@@ -202,11 +208,17 @@ class Story(BaseModel, HasLocation):
     __tablename__ = 'stories'
 
     text = db.Column(db.String(512))
+    replies_enabled = db.Column(db.Boolean, default=True)
+
     media_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     media = db.relationship('Blob', uselist=False)
     user = db.relationship('User', uselist=False)
+
+    def user_can_comment(self, user):
+        return self.replies_enabled and user.id not in loads(
+            user.blocked_users)
 
 
 class User(BaseModel, HasToken, HasLocation):
