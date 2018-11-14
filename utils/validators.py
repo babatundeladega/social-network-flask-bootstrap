@@ -1,12 +1,13 @@
+import re
+
 from lepl.apps.rfc3696 import Email
 
+from app.constants import (
+    MAX_USER_BIO_LENGTH, MIN_USER_BIO_LENGTH, MIN_PASSWORD_LENGTH)
 from app.errors import BadRequest
 
 
 def check_address_field(value):
-    if value is None:
-        return
-
     required_keys = {'street_address', 'lga', 'town', 'country', 'province',
         'state', 'zip_code'}
 
@@ -26,19 +27,26 @@ def check_amount_field(value):
         raise BadRequest('{} is an invalid amount'.format(value))
 
 
-def check_email_field(value):
-    if value is None:
-        return
+def check_bio_field(value):
+    min_value = min(len(value), MIN_USER_BIO_LENGTH)
+    max_value = max(len(value), MAX_USER_BIO_LENGTH)
 
+    if min_value != MIN_USER_BIO_LENGTH:
+        raise BadRequest('Bio must be at least 4 characters')
+
+    if max_value != MAX_USER_BIO_LENGTH:
+        raise BadRequest('Bio must be less than 140 characters')
+
+    return min_value == max_value
+
+
+def check_email_field(value):
     validator = Email()
     if not validator(value):
         raise BadRequest('`email` {} is invalid.'.format(value))
 
 
 def check_field_length(value, length, _greater=True, _lesser=False):
-    if value is None:
-        return
-
     if _greater and len(value) < length:
         raise BadRequest(
             'Field must be greater than {} characters'.format(length))
@@ -46,6 +54,10 @@ def check_field_length(value, length, _greater=True, _lesser=False):
     if _lesser and len(value) > length:
         raise BadRequest(
             'Field must be lesser than {} characters'.format(length))
+
+
+def check_password_field(value):
+    return len(value) >= MIN_PASSWORD_LENGTH
 
 
 def check_phone_field(value):
@@ -79,3 +91,13 @@ def check_url_field(value):
         return
 
     return
+
+
+def check_username_field(value):
+    regex_ = r'^[a-zA-Z0-9_.]+$'
+
+    pattern = re.compile(regex_)
+
+    if not pattern.match(value):
+        raise BadRequest(
+            "Username can have only '_', '.' and alphanumeric characters")

@@ -6,7 +6,7 @@ from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 
 from app import errors, logger
-from app.models import User
+from app.models import App, User
 
 
 def _do_basic_auth():
@@ -61,11 +61,35 @@ def _authenticate_user(obtaining_token):
     return user
 
 
-def auth_required(obtaining_token=False):
-    """Do User authentication.
+def app_auth_required():
+    def view_func_decor(view_func):
 
-    Use different authentication strategies to determine the authorization of
-    the accessing User
+        @wraps(view_func)
+        def decorated_func(*args, **kwargs):
+            api_key = request.headers.get('api-key')
+
+            if api_key is None:
+                raise errors.UnauthorizedError(
+                    '`api-key` must be sent in headers')
+
+            app = App.get_active(api_key=api_key)
+
+            if app is None:
+                raise errors.BadRequest('`api-key` is invalid')
+
+            return view_func(*args, **kwargs)
+
+        return decorated_func
+
+    return view_func_decor
+
+
+def user_auth_required(obtaining_token=False):
+    """Do User authentication
+
+    Args:
+        obtaining_token (bool): Whether or not a token is to be obtained in
+            that function
     """
     def view_func_decor(view_func):
 
@@ -90,4 +114,3 @@ def auth_required(obtaining_token=False):
         return decorated_func
 
     return view_func_decor
-
