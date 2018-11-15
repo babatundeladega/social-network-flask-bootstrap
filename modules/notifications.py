@@ -3,18 +3,17 @@ from flask.views import MethodView
 from .authentication import user_auth_required
 from app.errors import ResourceNotFound
 from app.models import Notification, User
+from utils.contexts import get_current_user
 from utils.response_helpers import api_success_response
 
 
 class NotificationsView(MethodView):
     @user_auth_required()
-    def get(self, user_uid):
-        user = User.get(uid=user_uid)
-        if user is None:
-            raise ResourceNotFound('User not found')
+    def get(self):
+        current_user = get_current_user()
 
         pagination = Notification.query.filter(
-            user_id=user.id
+            user_id=current_user.id
         ).paginate()
 
         data = []

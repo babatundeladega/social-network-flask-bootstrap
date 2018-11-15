@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from json import loads
 import time
 
-from flask import current_app, g
+from flask import current_app, g, url_for
+from sqlalchemy.ext.hybrid import hybrid_property
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -117,6 +118,21 @@ class Blob(BaseModel):
 
     data = db.Column(db.TEXT)
     mime_type = db.Column(db.Enum(*ACCEPTED_MIME_TYPES))
+
+    @property
+    def url(self):
+        return url_for('web_blueprint.blob', blob_uid=self.uid)
+
+
+class Collection(BaseModel):
+    __tablename__ = 'collections'
+
+    title = db.Column(db.String(32))
+
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    user = db.relationship(
+        'User', backref=db.backref('collections', uselist=True), uselist=False)
 
 
 class Comment(BaseModel):
@@ -306,15 +322,25 @@ class Story(BaseModel, HasLocation):
     text = db.Column(db.String(512))
     replies_enabled = db.Column(db.Boolean, default=True)
 
-    media_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
+    blob_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
-    media = db.relationship('Blob', uselist=False)
+    blob = db.relationship('Blob', uselist=False)
     user = db.relationship('User', uselist=False)
+
+    @hybrid_property
+    def has_expired(self):
+        return datetime.utcnow() - timedelta(days=1) < self.created_at
 
     def user_can_comment(self, user):
         return self.replies_enabled and user.id not in loads(
             user.blocked_users)
+
+    def as_json(self):
+        return {
+            'blob': self.blob.url,
+            'user': self.user.uid,
+        }
 
 
 class User(BaseModel, HasToken, HasLocation):

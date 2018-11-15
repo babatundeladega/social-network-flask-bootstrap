@@ -40,6 +40,11 @@ def check_bio_field(value):
     return min_value == max_value
 
 
+def check_boolean_field(value):
+    if not type(value) is bool:
+        raise BadRequest('Boolean expected, not {}'.format(value))
+
+
 def check_email_field(value):
     validator = Email()
     if not validator(value):
