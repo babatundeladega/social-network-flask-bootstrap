@@ -6,6 +6,7 @@ from app.constants import APP_NAME
 class DevelopmentConfig(object):
     DEBUG = True
 
+    APP_NAME = ''
     API_REQUESTS_TIMEOUT = 30
 
     MESSAGING_API_KEY = 'Ai48NVEN6fBbwHbQAWfEFP'
@@ -25,6 +26,7 @@ class DevelopmentConfig(object):
 
 
 class ProductionConfig(object):
+    APP_NAME = ''
     API_REQUESTS_TIMEOUT = 30
 
     MESSAGING_API_KEY = ''
