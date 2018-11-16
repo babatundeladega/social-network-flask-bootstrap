@@ -61,7 +61,7 @@ class HasToken(object):
         except BadSignature:
             raise errors.InvalidAuthToken
 
-        return getattr(cls, 'query').get(data['id'])
+        return getattr(cls, 'query').get_not_deleted(data['id'])
 
 
 class LookUp(object):

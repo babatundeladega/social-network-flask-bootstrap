@@ -5,7 +5,10 @@ from app.constants import MIN_STORY_TEXT_LENGTH
 from app.errors import BadRequest, ResourceNotFound, UnauthorizedError
 from app.models import Blob, Story, User
 from app.models import followers
-from utils.contexts import get_current_request_data, get_current_user
+from utils.contexts import (
+    get_current_request_args,
+    get_current_request_data,
+    get_current_user)
 from utils.response_helpers import (
     api_created_response, api_deleted_response, api_success_response)
 from utils.validators import check_boolean_field, check_field_length
@@ -15,6 +18,7 @@ class StoriesView(MethodView):
     @staticmethod
     def create_new_story(params):
         story = Story(
+            user_id=get_current_user().id,
             **params
         )
 
@@ -53,9 +57,13 @@ class StoriesView(MethodView):
 
 
     @user_auth_required()
-    def get(self, user_uid=None):
+    def get(self):
         """Get a user's stories"""
-        if user_uid is None:
+        request_args = get_current_request_args()
+
+        user_uid = request_args.get('user_uid')
+
+        if user_uid is not None:
             user = User.get_active(uid=user_uid)
             if user is None:
                 raise ResourceNotFound('User not found')

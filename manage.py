@@ -57,7 +57,7 @@ def pump_currencies_table():
     ]
 
     for name, short_code, usd_equivalent in currencies:
-        if Currency.get(name=name):
+        if Currency.get_active(name=name):
             continue
 
         Currency(
@@ -113,7 +113,7 @@ def pump_statuses_table():
     }
 
     for status, id_ in status_modes_and_ids.items():
-        if Status.get(name=status) is not None:
+        if Status.get_active(name=status) is not None:
             continue
 
         status = Status(name=status)

@@ -34,9 +34,10 @@ value of `api-key` when making requests to an **App**'s child resources
 the value of `Authorization` when making requests to a **User**'s child 
 resources (ex. Notifications, Messages)
 
+Only one of the above should be sent per request. 
 
 ## Usage
 This project will be deployed on Heroku later on, so developers would only 
-need to integrate with the API, but currently
+need to integrate with the API, but currently you could
 + Git clone and modify as you wish. *For an out-of-box experience, edit 
 only instance/config.py!*

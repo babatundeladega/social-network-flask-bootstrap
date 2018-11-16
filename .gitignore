@@ -6,7 +6,7 @@
 
 *.pyc
 
-instance/config.py
+config.py
 
 local_migrations/
 remote_migrations/

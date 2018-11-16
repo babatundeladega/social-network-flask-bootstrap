@@ -199,6 +199,17 @@ class Location(BaseModel):
     latitude = db.Column(db.String(10))
     longitude = db.Column(db.String(10))
 
+    def as_json(self):
+        return {
+            'postal_code': self.postal_code,
+            'street_address': self.street_address,
+            'city': self.city,
+            'state': self.state,
+            'country': self.country,
+            'latitude': self.latitude,
+            'longitude': self.longitude
+        }
+
 
 class Message(BaseModel):
     __tablename__ = 'messages'
@@ -296,17 +307,45 @@ class Post(BaseModel, HasLocation):
     text = db.Column(db.TEXT)
     comments_enabled = db.Column(db.Boolean, default=True)
 
-    photo_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    video_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
 
-    photo = db.relationship('Blob', uselist=False, foreign_keys=[photo_id])
     user = db.relationship('User', uselist=False)
-    video = db.relationship('Blob', uselist=False, foreign_keys=[video_id])
 
     def user_can_comment(self, user):
         return self.comments_enabled and user.id not in loads(
             user.blocked_store_repliers)
+
+    def likes(self):
+        return Like.query.filter_by(post_id=self.id)
+
+    def comments(self):
+        return Comment.query.filter_by(post_id=self.id)
+
+    def as_json(self):
+        return {
+            'text': self.text,
+            'comments_enabled': self.comments_enabled,
+            'user': self.user.as_json(),
+            'slides': self.post_slides,
+            'location': self.location.as_json(),
+            'likes': {
+                'count': self.likes().count()
+            },
+            'comments': {
+                'count': self.comments().count()
+            }
+        }
+
+
+class PostSlide(BaseModel):
+    __tablename__ = 'post_slides'
+
+    blob_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
+
+    blob = db.relationship('Blob', uselist=False)
+    post = db.relationship(
+        'Post', uselist=False, backref=db.backref('post_slides', uselist=True))
 
 
 class Status(BaseModel, LookUp):
@@ -341,6 +380,13 @@ class Story(BaseModel, HasLocation):
             'blob': self.blob.url,
             'user': self.user.uid,
         }
+
+
+class StoryView(BaseModel):
+    __tablename__ = 'story_views'
+
+    story_id = db.Column(db.Integer, db.ForeignKey('stories.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
 
 class User(BaseModel, HasToken, HasLocation):
@@ -393,7 +439,7 @@ class User(BaseModel, HasToken, HasLocation):
 
     @classmethod
     def get_for_auth(cls, **filter_args):
-        user = cls.get(**filter_args)
+        user = cls.get_not_deleted(**filter_args)
 
         # Even if the authentication process outside
         # here fails, we can at least know who the "current_user" is
