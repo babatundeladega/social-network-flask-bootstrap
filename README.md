@@ -17,6 +17,7 @@ So, for all interested in building the next big social network, here is somethin
 + Apps
     + Users
         + Collections
+        + Locations
         + Messages
         + Notifications
         + Posts

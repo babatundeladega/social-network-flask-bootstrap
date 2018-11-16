@@ -3,7 +3,8 @@ from flask.views import MethodView
 from .authentication import user_auth_required
 from app.constants import MIN_POST_TEXT_LENGTH
 from app.errors import BadRequest, ResourceNotFound, UnauthorizedError
-from app.models import Blob, Post, User
+from app.models import Blob, Location, Post, User
+from app.models import followers
 from utils.contexts import (
     get_current_request_args,
     get_current_request_data,
@@ -43,17 +44,28 @@ class PostsView(MethodView):
         if text is not None:
             check_field_length(text, MIN_POST_TEXT_LENGTH)
 
-        blobs = request_data.get('blobs')
-        if not isinstance(blobs, list):
+        location_uid = request_data.get('location_uid')
+        location = Location.get_active(uid=location_uid)
+        if bool(location_uid) != bool(location):
+            raise ResourceNotFound('`location_uid` not found')
+
+        request_blobs = request_data.get('blobs')
+        if not isinstance(request_blobs, list):
             raise BadRequest('`blobs` must be an array')
 
-        for blob_uid in blobs:
+        blobs = []
+        for blob_uid in request_blobs:
             try:
-                Blob.get_active(uid=blob_uid)
+                blob = Blob.get_active(uid=blob_uid)
+                blobs.append(blob)
             except :
                 raise ResourceNotFound('Blob `{}` not found'.format(blob_uid))
 
-        return dict(comments_enabled=comments_enabled, blobs=blobs, text=text)
+        return dict(
+            blobs=blobs,
+            comments_enabled=comments_enabled,
+            location=location,
+            text=text)
 
     def __validate_post_creation_params(self, request_data):
         required_params = {'blobs'}
@@ -68,7 +80,7 @@ class PostsView(MethodView):
         return self.__check_post_params(request_data)
 
     def __validate_post_edit_params(self, params):
-        self.__check_post_params(params)
+        return self.__check_post_params(params)
 
 
     @user_auth_required()
@@ -148,4 +160,23 @@ class TimelinePostsView(MethodView):
     @user_auth_required()
     def get(self):
         """Get all the posts for a timeline"""
-        return
+        user = get_current_user()
+
+        followed = Post.query.join(
+            followers, (followers.c.followed_id == Post.user_id)
+        ).filter(
+            followers.c.follower_id == user.id
+        )
+
+        own = Post.query.filter_by(
+            user_id=user.id
+        ).order_by(
+            Post.created_at.desc()
+        )
+
+        pagination = followed.union(own).paginate()
+
+        return api_success_response(
+            data=[item.as_json() for item in pagination.items],
+            meta=pagination.meta
+        )
