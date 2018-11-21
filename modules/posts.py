@@ -13,16 +13,19 @@ from utils.response_helpers import (
     api_created_response,
     api_deleted_response,
     api_success_response)
-from utils import extract_hash_tags_for_text
+from utils import extract_hash_tags_for_text, trim_hash_tag
 from utils.validators import check_boolean_field, check_field_length
 
 
 class PostsView(MethodView):
     @staticmethod
     def create_post(params):
-        text = params.text
+        text = params['text']
 
-        hash_tags = extract_hash_tags_for_text(text)
+        extracted_hash_tags = extract_hash_tags_for_text(text)
+        hash_tags = filter(lambda x: trim_hash_tag(x), extracted_hash_tags)
+
+        # TODO create hash tag for each of the items of the list
 
         post = Post(
             user_id=get_current_user().id,
