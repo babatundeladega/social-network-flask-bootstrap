@@ -2,9 +2,12 @@ ACCEPTED_MIME_TYPES = [
     'application/json', 'application/pdf', 'image/png', 'video/mp4']
 APP_NAME = ''
 
+DEFAULT_HASH_TAG_FETCH_SCOPE = 'meta'
 DEFAULT_TOKEN_COUNT = 20
 
 EMAIL_CONFIRMATION_LINK_LIFESPAN = (60 * 60)
+
+HASH_TAG_RETRIEVAL_SCOPES = ['meta', 'posts', 'followers']
 
 MAX_USER_BIO_LENGTH = 140
 MIN_COLLECTION_NAME_LENGTH = 2

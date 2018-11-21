@@ -5,6 +5,7 @@ from app.constants import MIN_POST_TEXT_LENGTH
 from app.errors import BadRequest, ResourceNotFound, UnauthorizedError
 from app.models import Blob, Location, Post, User
 from app.models import followers
+from modules.hashtags import HashTagsView
 from utils.contexts import (
     get_current_request_args,
     get_current_request_data,
@@ -23,9 +24,10 @@ class PostsView(MethodView):
         text = params['text']
 
         extracted_hash_tags = extract_hash_tags_for_text(text)
-        hash_tags = filter(lambda x: trim_hash_tag(x), extracted_hash_tags)
-
-        # TODO create hash tag for each of the items of the list
+        hash_tag_orms = map(
+            lambda x: HashTagsView.create_hash_tag(x),
+            extracted_hash_tags
+        )
 
         post = Post(
             user_id=get_current_user().id,
@@ -33,6 +35,11 @@ class PostsView(MethodView):
         )
 
         post.save()
+
+        map(
+            lambda x: HashTagsView.add_post_to_hash_tag(post, x),
+            hash_tag_orms
+        )
 
         return post
 

@@ -26,7 +26,9 @@ def confirm_token(token, expiration=EMAIL_CONFIRMATION_LINK_LIFESPAN):
 def extract_hash_tags_for_text(text):
     text_splitted = text.split(' ')
 
-    return list(filter(lambda x: x.startswith('#'), text_splitted))
+    return list(
+        filter(lambda x: trim_hash_tag(x.startswith('#')), text_splitted)
+    )
 
 
 def generate_phone_verification_code():

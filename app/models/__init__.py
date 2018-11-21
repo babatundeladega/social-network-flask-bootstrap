@@ -359,6 +359,8 @@ class Post(BaseModel, HasLocation):
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
+    hash_tags = db.relationship(
+        'HashTag', secondary=hash_tag_posts, backref='posts', lazy='dynamic')
     post_slides = db.relationship('Blob', uselist=True)
     user = db.relationship('User', uselist=False)
 
