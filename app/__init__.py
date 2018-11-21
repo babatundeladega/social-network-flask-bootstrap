@@ -4,9 +4,9 @@ import asyncio
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
-from config import get_configuration_class
 from .errors.handlers import setup_error_handling
 from .logs import logger
+from config import get_configuration_class
 from utils.contexts.handlers import before_every_request, after_every_request
 
 

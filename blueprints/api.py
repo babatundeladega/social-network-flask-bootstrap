@@ -1,5 +1,6 @@
 from flask import Blueprint
 
+from modules import StoriesView
 from app.constants import APP_NAME
 from utils.response_helpers import api_success_response
 
@@ -13,7 +14,8 @@ def render_welcome_greeting():
 
 
 mappings = [
-
+    ('/stories', StoriesView, 'stories'),
+    ('/stories/<story_uid>', StoriesView, 'story'),
 ]
 
 

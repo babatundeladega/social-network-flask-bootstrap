@@ -9,16 +9,21 @@ from utils.contexts import (
     get_current_request_args,
     get_current_request_data,
     get_current_user)
-from utils.validators import check_boolean_field, check_field_length
 from utils.response_helpers import (
     api_created_response,
     api_deleted_response,
     api_success_response)
+from utils import extract_hash_tags_for_text
+from utils.validators import check_boolean_field, check_field_length
 
 
 class PostsView(MethodView):
     @staticmethod
     def create_post(params):
+        text = params.text
+
+        hash_tags = extract_hash_tags_for_text(text)
+
         post = Post(
             user_id=get_current_user().id,
             **params
@@ -53,16 +58,16 @@ class PostsView(MethodView):
         if not isinstance(request_blobs, list):
             raise BadRequest('`blobs` must be an array')
 
-        blobs = []
+        post_slides = []
         for blob_uid in request_blobs:
             try:
                 blob = Blob.get_active(uid=blob_uid)
-                blobs.append(blob)
+                post_slides.append(blob)
             except :
                 raise ResourceNotFound('Blob `{}` not found'.format(blob_uid))
 
         return dict(
-            blobs=blobs,
+            post_slides=post_slides,
             comments_enabled=comments_enabled,
             location=location,
             text=text)
@@ -93,7 +98,7 @@ class PostsView(MethodView):
         if user_uid is not None:
             user = User.get_active(uid=user_uid)
             if user is None:
-                raise ResourceNotFound
+                raise ResourceNotFound('User not found')
 
         else:
             user = get_current_user()
@@ -101,7 +106,7 @@ class PostsView(MethodView):
         if post_uid is not None:
             post = Post.get_active(uid=post_uid, user_id=user.id)
             if post is None:
-                raise ResourceNotFound
+                raise ResourceNotFound('Post not found')
 
             return api_success_response(data=post.as_json())
 
@@ -130,7 +135,7 @@ class PostsView(MethodView):
 
         post = Post.get_active(uid=post_uid)
         if post is None:
-            raise ResourceNotFound()
+            raise ResourceNotFound('Post not found')
 
         if post.user != get_current_user():
             raise UnauthorizedError()
@@ -146,7 +151,7 @@ class PostsView(MethodView):
         """Delete a post"""
         post = Post.get_active(uid=post_uid)
         if post is None:
-            raise ResourceNotFound()
+            raise ResourceNotFound('Post not found')
 
         if post.user != get_current_user():
             raise UnauthorizedError()

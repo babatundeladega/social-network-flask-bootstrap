@@ -45,6 +45,14 @@ def check_boolean_field(value):
         raise BadRequest('Boolean expected, not {}'.format(value))
 
 
+def check_coordinate_field(latitude=None, longitude=None):
+    if latitude is not None and not -90 < latitude < 90:
+        raise BadRequest('Latitude is invalid')
+
+    if longitude is not None and not -180 < longitude < 180:
+        raise BadRequest('Longitude is invalid')
+
+
 def check_email_field(value):
     validator = Email()
     if not validator(value):

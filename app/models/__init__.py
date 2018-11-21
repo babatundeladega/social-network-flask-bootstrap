@@ -18,6 +18,13 @@ from utils.contexts import (
     get_current_api_ref, get_current_request_data, get_current_request_headers)
 
 
+collection_items = db.Table(
+    'collection_items', db.metadata,
+    db.Column('collection_id', db.Integer, db.ForeignKey('collections.id')),
+    db.Column('post_id', db.Integer, db.ForeignKey('posts.id'))
+)
+
+
 conversation_participants = db.Table(
     'conversation_participants', db.metadata,
     db.Column('conversation_id', db.Integer, db.ForeignKey('conversations.id')),
@@ -29,6 +36,27 @@ followers = db.Table(
     'followers', db.metadata,
     db.Column('follower_id', db.Integer, db.ForeignKey('users.id')),
     db.Column('followed_id', db.Integer, db.ForeignKey('users.id'))
+)
+
+
+hash_tag_posts = db.Table(
+    'hash_tag_posts', db.metadata,
+    db.Column('hash_tag_id', db.Integer, db.ForeignKey('hash_tags.id')),
+    db.Column('post_id', db.Integer, db.ForeignKey('posts.id'))
+)
+
+
+hash_tag_followers = db.Table(
+    'hash_tag_follows', db.metadata,
+    db.Column('hash_tag_id', db.Integer, db.ForeignKey('hash_tags.id')),
+    db.Column('follower_id', db.Integer, db.ForeignKey('users.id'))
+)
+
+
+story_views = db.Table(
+    'story_views', db.metadata,
+    db.Column('story_id', db.Integer, db.ForeignKey('stories.id')),
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'))
 )
 
 
@@ -93,6 +121,10 @@ class BaseModel(db.Model, HasStatus, Persistence):
         query_.limit(NESTED_VALUES_LIMIT)
 
         return [record[0] for record in query_.all()]
+
+
+class App(BaseModel, LookUp):
+    __tablename__ = 'apps'
 
 
 class AccessLog(BaseModel):
@@ -176,6 +208,12 @@ class Conversation(BaseModel):
         backref=db.backref('users', uselist=True), uselist=True)
 
 
+class HashTag(BaseModel):
+    __tablename__ = 'hash_tags'
+
+    entity = db.Column(db.String(128), unique=True)
+
+
 class Like(BaseModel):
     __tablename__ = 'likes'
 
@@ -190,21 +228,33 @@ class Like(BaseModel):
 
 class Location(BaseModel):
     __tablename__ = 'locations'
+    __table_args__ = (
+        db.UniqueConstraint(
+            'name', 'postal_code', 'street address', 'city',
+            'state_or_province', 'country', 'latitude', 'longitude',
+            name='location_unique_index'),
+    )
 
+    name = db.Column(db.String(36))
     postal_code = db.Column(db.String(20))
     street_address = db.Column(db.String(20))
     city = db.Column(db.String(32))
-    state = db.Column(db.String(32))
+    state_or_province = db.Column(db.String(32))
     country = db.Column(db.String(30))
     latitude = db.Column(db.String(10))
     longitude = db.Column(db.String(10))
+
+    @property
+    def _name(self):
+        return self.name or '{}, {}, {}.'.format(
+            self.city, self.state_or_province, self.country)
 
     def as_json(self):
         return {
             'postal_code': self.postal_code,
             'street_address': self.street_address,
             'city': self.city,
-            'state': self.state,
+            'state_or_province': self.state_or_province,
             'country': self.country,
             'latitude': self.latitude,
             'longitude': self.longitude
@@ -309,6 +359,7 @@ class Post(BaseModel, HasLocation):
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
+    post_slides = db.relationship('Blob', uselist=True)
     user = db.relationship('User', uselist=False)
 
     def user_can_comment(self, user):
@@ -335,18 +386,7 @@ class Post(BaseModel, HasLocation):
                 'count': self.comments().count()
             }
         }
-
-
-class PostSlide(BaseModel):
-    __tablename__ = 'post_slides'
-
-    blob_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
-    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
-
-    blob = db.relationship('Blob', uselist=False)
-    post = db.relationship(
-        'Post', uselist=False, backref=db.backref('post_slides', uselist=True))
-
+    
 
 class Status(BaseModel, LookUp):
     __tablename__ = 'statuses'
@@ -382,13 +422,6 @@ class Story(BaseModel, HasLocation):
         }
 
 
-class StoryView(BaseModel):
-    __tablename__ = 'story_views'
-
-    story_id = db.Column(db.Integer, db.ForeignKey('stories.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-
-
 class User(BaseModel, HasToken, HasLocation):
     """Users of the social network"""
     __tablename__ = 'users'
@@ -400,6 +433,7 @@ class User(BaseModel, HasToken, HasLocation):
     email_confirmed = db.Column(db.Boolean, default=False)
     phone = db.Column(db.String(20), unique=True, index=True)
     phone_confirmed = db.Column(db.Boolean, default=False)
+    verified = db.Column(db.Boolean, default=False)
     profile_photo_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
     blocked_users = db.Column(db.TEXT)
     blocked_story_repliers = db.Column(db.TEXT)
@@ -417,7 +451,13 @@ class User(BaseModel, HasToken, HasLocation):
     def _profile_photo(self):
         return Blob.query.filter_by(id=self.profile_photo_id).first()
 
+    def is_following(self, user):
+        return self.followed.filter(
+            followers.c.followed_id == user.id).count() > 0
+
     def as_json(self, keys_to_exclude=None):
+        collections = self.collections()
+
         result = {
             'uid': self.uid,
             'name': self.name,
@@ -427,6 +467,10 @@ class User(BaseModel, HasToken, HasLocation):
             'phone_confirmed': self.phone_confirmed,
             'profile_photo': self.profile_photo,
             'created_at': self.created_at.isoformat(),
+            'collections': {
+                'count': self.collections.count(),
+                'uid': None
+            }
         }
 
         if isinstance(keys_to_exclude, (list, tuple, set)):

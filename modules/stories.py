@@ -10,7 +10,9 @@ from utils.contexts import (
     get_current_request_data,
     get_current_user)
 from utils.response_helpers import (
-    api_created_response, api_deleted_response, api_success_response)
+    api_created_response,
+    api_deleted_response,
+    api_success_response)
 from utils.validators import check_boolean_field, check_field_length
 
 
@@ -57,8 +59,8 @@ class StoriesView(MethodView):
 
 
     @user_auth_required()
-    def get(self):
-        """Get a user's stories"""
+    def get(self, story_uid=None):
+        """Get a story or a list of a user's stories"""
         request_args = get_current_request_args()
 
         user_uid = request_args.get('user_uid')
@@ -69,6 +71,13 @@ class StoriesView(MethodView):
                 raise ResourceNotFound('User not found')
         else:
             user = get_current_user()
+
+        if story_uid is not None:
+            story = Story.get_active(uid=story_uid, has_expired=False)
+            if story is None:
+                raise ResourceNotFound('Story not found')
+
+            return api_success_response(data=story.as_json())
 
         todays_stories = Story.prepare_get_active(
             user_id=user.id
