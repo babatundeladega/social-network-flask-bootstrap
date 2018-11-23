@@ -3,7 +3,7 @@ from flask.views import MethodView
 from .authentication import user_auth_required
 from app.constants import MIN_COLLECTION_NAME_LENGTH
 from app.errors import BadRequest, ResourceNotFound
-from app.models import User, Collection
+from app.models import Collection, Post, User
 from utils.contexts import (
     get_current_request_args,
     get_current_request_data,
@@ -18,6 +18,8 @@ from utils.validators import check_field_length
 class CollectionsView(MethodView):
     @staticmethod
     def create_collection(params):
+        """Create a collection and return the ORM object of the collection
+        created"""
         collection = Collection(**params)
         collection.save()
 
@@ -25,6 +27,8 @@ class CollectionsView(MethodView):
 
     @staticmethod
     def edit_collection(collection, params):
+        """Edit a collection and return the ORM object of the collection
+        edited"""
         collection.update(params)
 
         return collection
@@ -56,7 +60,7 @@ class CollectionsView(MethodView):
     
     @user_auth_required()
     def post(self):
-        """Get a list of a user's collections, or """
+        """Create a collection"""
         request_data = get_current_request_data()
 
         params = self.__validate_collection_creation_params(request_data)
@@ -80,15 +84,23 @@ class CollectionsView(MethodView):
         else:
             user = get_current_user()
 
-        collection = Collection.get_not_deleted(
-            uid=collection_uid,
-            user_id=user.id
+        if collection_uid is not None:
+            collection = Collection.get_not_deleted(
+                uid=collection_uid,
+                user_id=user.id
+            )
+
+            if collection is None:
+                raise ResourceNotFound('Collection not found')
+
+            return api_success_response(collection.as_json())
+
+        pagination = user.collections.paginate()
+
+        return api_success_response(
+            data=[collection.as_json() for collection in pagination.items()],
+            meta=pagination.meta
         )
-
-        if collection is None:
-            raise ResourceNotFound('Collection not found')
-
-        return api_success_response(collection.as_json())
 
     def patch(self, collection_uid):
         request_data = get_current_request_data()
@@ -99,15 +111,49 @@ class CollectionsView(MethodView):
 
         params = self.__validate_collection_update_params(request_data)
 
-        collection = self.edit_collection(collection,params)
+        collection = self.edit_collection(collection, params)
+
+        return api_success_response(collection.as_json())
+
+    def delete(self, collection_uid):
+        """Delete a collection"""
+        collection = Collection.get_active(collection_uid)
+        if collection is None:
+            raise ResourceNotFound('Collection not found')
+
+        collection.delete()
+
+        return api_deleted_response()
+
+
+class CollectionPostsView(MethodView):
+    def put(self, collection_uid, post_uid):
+        """Add a post to a collection"""
+        collection = Collection.get_not_deleted(uid=collection_uid)
+        if collection is None:
+            raise ResourceNotFound('Collection not found')
+
+        post = Post.get_not_deleted(uid=post_uid)
+        if post is None:
+            raise ResourceNotFound('Post not found')
+
+        post.update(collection_id=collection.id)
 
         return api_success_response()
 
-    def delete(self, collection_uid):
-        collection = Collection.get_active(collection_uid)
+    def delete(self, collection_uid, post_uid):
+        """Remove a post from a collection"""
+        collection = Collection.get_not_deleted(uid=collection_uid)
         if collection is None:
-            raise ResourceNotFound()
+            raise ResourceNotFound('Collection not found')
 
-        collection.delete()
+        post = Post.get_not_deleted(uid=post_uid)
+        if post is None:
+            raise ResourceNotFound('Post not found')
+
+        if post.collection_id != collection.id:
+            raise ResourceNotFound('Post not found')
+
+        post.update(collection_id=None)
 
         return api_deleted_response()

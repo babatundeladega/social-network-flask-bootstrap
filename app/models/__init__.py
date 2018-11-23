@@ -47,14 +47,14 @@ hash_tag_posts = db.Table(
 
 
 hash_tag_followers = db.Table(
-    'hash_tag_follows', db.metadata,
+    'hash_tag_followers', db.metadata,
     db.Column('hash_tag_id', db.Integer, db.ForeignKey('hash_tags.id')),
     db.Column('follower_id', db.Integer, db.ForeignKey('users.id'))
 )
 
 
-story_views = db.Table(
-    'story_views', db.metadata,
+story_viewers = db.Table(
+    'story_viewers', db.metadata,
     db.Column('story_id', db.Integer, db.ForeignKey('stories.id')),
     db.Column('user_id', db.Integer, db.ForeignKey('users.id'))
 )
@@ -166,6 +166,11 @@ class Collection(BaseModel):
     user = db.relationship(
         'User', backref=db.backref('collections', uselist=True), uselist=False)
 
+    def contains_post(self, post):
+        self.posts.filter_by(
+            Post.uid == post.user_id
+        ).count() > 0
+
 
 class Comment(BaseModel):
     __tablename__ = 'comments'
@@ -204,14 +209,20 @@ class Conversation(BaseModel):
     __tablename__ = 'conversations'
 
     users = db.relationship(
-        "Conversation", secondary=conversation_participants,
-        backref=db.backref('users', uselist=True), uselist=True)
+        "User", secondary=conversation_participants,
+        backref=db.backref('conversations', uselist=True), uselist=True,
+        lazy='dynamic')
 
 
 class HashTag(BaseModel):
     __tablename__ = 'hash_tags'
 
     entity = db.Column(db.String(128), unique=True)
+
+    followers = db.relationship(
+        'User', secondary=hash_tag_followers,
+        backref=db.backref('hash_tags_followed', uselist=True), uselist=True,
+        lazy='dynamic')
 
 
 class Like(BaseModel):
@@ -257,7 +268,8 @@ class Location(BaseModel):
             'state_or_province': self.state_or_province,
             'country': self.country,
             'latitude': self.latitude,
-            'longitude': self.longitude
+            'longitude': self.longitude,
+            'name': self._name
         }
 
 
@@ -357,11 +369,13 @@ class Post(BaseModel, HasLocation):
     text = db.Column(db.TEXT)
     comments_enabled = db.Column(db.Boolean, default=True)
 
+    collection_id = db.Column(db.Integer, db.ForeignKey('collections.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
+    collection = db.relationship(
+        'Collection', backref=db.backref('posts', uselist=True), uselist=False)
     hash_tags = db.relationship(
         'HashTag', secondary=hash_tag_posts, backref='posts', lazy='dynamic')
-    post_slides = db.relationship('Blob', uselist=True)
     user = db.relationship('User', uselist=False)
 
     def user_can_comment(self, user):
@@ -388,7 +402,21 @@ class Post(BaseModel, HasLocation):
                 'count': self.comments().count()
             }
         }
-    
+
+
+class PostSlide(BaseModel):
+    __tablename__ = 'post_slides'
+
+    blob_id = db.Column(db.Integer, db.ForeignKey('blobs.id'))
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
+
+    blob = db.relationship(
+        'Blob', backref=db.backref('post_slides', uselist=True),
+        uselist=False)
+    post = db.relationship(
+        'Post', backref=db.backref('post_slides', uselist=True),
+        uselist=False)
+
 
 class Status(BaseModel, LookUp):
     __tablename__ = 'statuses'
@@ -408,6 +436,9 @@ class Story(BaseModel, HasLocation):
 
     blob = db.relationship('Blob', uselist=False)
     user = db.relationship('User', uselist=False)
+    viewers = db.relationship(
+        'User', secondary=story_viewers, backref=db.backref('stories_viewed'),
+        lazy='dynamic')
 
     @hybrid_property
     def has_expired(self):
